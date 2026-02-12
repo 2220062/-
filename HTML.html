@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マイ防災リュック</title>
+    <style>
+        :root {
+            --primary-color: #e67e22;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --danger-color: #e74c3c;
+        }
+
+        body {
+            font-family: sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 15px;
+            max-width: 500px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        #clock-container { text-align: right; font-size: 0.85rem; color: #666; }
+        .settings-trigger { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        /* 最終更新日の表示エリア */
+        .last-update {
+            font-size: 0.75rem;
+            color: #888;
+            text-align: center;
+            margin-bottom: 15px;
+            background: #eee;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .settings-panel {
+            display: none;
+            position: absolute;
+            top: 60px;
+            right: 25px;
+            background: white;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .settings-panel.active { display: block; }
+
+        h1 { color: var(--primary-color); text-align: center; margin-top: 0; }
+
+        .progress-bar {
+            background: #eee; height: 12px; border-radius: 6px;
+            margin-bottom: 8px; overflow: hidden;
+        }
+        #progress-fill { background: var(--primary-color); height: 100%; width: 0%; transition: 0.5s; }
+
+        .input-group { 
+            display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; 
+            background: #f9f9f9; padding: 12px; border-radius: 8px; border: 1px solid #eee;
+        }
+        .input-row { display: flex; gap: 8px; }
+        input[type="text"], input[type="date"] { 
+            padding: 10px; border: 1px solid #ddd; border-radius: 8px; outline: none; font-size: 0.9rem;
+        }
+        input[type="text"] { flex-grow: 2; }
+        input[type="date"] { flex-grow: 1; }
+        
+        .add-btn {
+            background: var(--primary-color); color: white; border: none;
+            padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold;
+        }
+
+        .suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+        .suggest-tag { background: #fff; border: 1px solid #ddd; padding: 4px 10px; border-radius: 15px; font-size: 0.75rem; cursor: pointer; }
+
+        .section-title {
+            font-size: 0.9rem; font-weight: bold; color: #555;
+            margin: 20px 0 10px; border-left: 4px solid var(--primary-color); padding-left: 10px;
+        }
+
+        ul { list-style: none; padding: 0; }
+        li { display: flex; flex-direction: column; padding: 12px; border-bottom: 1px solid #eee; background: white; }
+        .item-main { display: flex; align-items: center; width: 100%; }
+        input[type="checkbox"] { width: 20px; height: 20px; margin-right: 12px; cursor: pointer; }
+        .item-text { flex-grow: 1; font-size: 1rem; color: #333; }
+        
+        .expiry-label { font-size: 0.75rem; margin-left: 32px; margin-top: 4px; color: #888; }
+        .expired { color: var(--danger-color) !important; font-weight: bold; }
+        .near-expiry { color: #d35400; font-weight: bold; }
+
+        .del-btn { color: #ff6b6b; border: none; background: none; cursor: pointer; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div id="clock-container">
+        <div id="date-display"></div>
+        <div id="time-display" style="font-weight: bold;"></div>
+    </div>
+    <button class="settings-trigger" onclick="toggleSettings()">⚙️</button>
+</div>
+
+<div class="container">
+    <h1>🎒 マイ防災リュック</h1>
+
+    <div class="settings-panel" id="settings-panel">
+        <div style="font-weight: bold; margin-bottom: 10px; font-size: 0.8rem;">🎨 テーマ設定</div>
+        <input type="color" id="color-picker" value="#e67e22">
+    </div>
+
+    <div class="progress-bar">
+        <div id="progress-fill"></div>
+    </div>
+
+    <div class="last-update" id="last-update">最終点検日: 未記録</div>
+
+    <div class="input-group">
+        <div class="input-row">
+            <input type="text" id="item-input" placeholder="名前 (例: 非常食)">
+            <input type="date" id="expiry-input">
+        </div>
+        <button class="add-btn" id="add-btn">リストに追加する</button>
+    </div>
+
+    <div class="suggestions">
+        <button class="suggest-tag" onclick="quickAdd('飲料水')">💧 水</button>
+        <button class="suggest-tag" onclick="quickAdd('非常食')">🥫 非常食</button>
+        <button class="suggest-tag" onclick="quickAdd('簡易トイレ')">🚽 簡易トイレ</button>
+        <button class="suggest-tag" onclick="quickAdd('充電器')">🔋 充電器</button>
+    </div>
+
+    <div class="section-title">あとで入れるもの（未完了）</div>
+    <ul id="todo-list"></ul>
+
+    <div class="section-title">リュックに入れた！（完了）</div>
+    <ul id="done-list"></ul>
+</div>
+
+<script>
+    const colorPicker = document.getElementById('color-picker');
+    const settingsPanel = document.getElementById('settings-panel');
+    const input = document.getElementById('item-input');
+    const expiryInput = document.getElementById('expiry-input');
+    const addBtn = document.getElementById('add-btn');
+    const todoList = document.getElementById('todo-list');
+    const doneList = document.getElementById('done-list');
+    const progressFill = document.getElementById('progress-fill');
+    const lastUpdateLabel = document.getElementById('last-update');
+
+    // データの読み込み
+    let items = JSON.parse(localStorage.getItem('my-disaster-kit-v7')) || [];
+    let themeColor = localStorage.getItem('my-kit-color-v7') || '#e67e22';
+    let lastCheckedDate = localStorage.getItem('my-kit-last-date') || '未記録';
+
+    function toggleSettings() { settingsPanel.classList.toggle('active'); }
+
+    function applyColor(color) {
+        document.documentElement.style.setProperty('--primary-color', color);
+        colorPicker.value = color;
+        localStorage.setItem('my-kit-color-v7', color);
+    }
+    colorPicker.addEventListener('input', (e) => applyColor(e.target.value));
+    applyColor(themeColor);
+
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('date-display').textContent = now.toLocaleDateString('ja-JP', {year:'numeric', month:'long', day:'numeric', weekday:'short'});
+        document.getElementById('time-display').textContent = now.toLocaleTimeString('ja-JP');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function render() {
+        todoList.innerHTML = '';
+        doneList.innerHTML = '';
+        let doneCount = 0;
+        const today = new Date().setHours(0, 0, 0, 0);
+
+        items.forEach((item, index) => {
+            const li = document.createElement('li');
+            let expiryHtml = '';
+            let expiryClass = '';
+            if (item.expiry) {
+                const expDate = new Date(item.expiry).getTime();
+                const diffDays = (expDate - today) / (1000 * 60 * 60 * 24);
+                if (diffDays < 0) { expiryClass = 'expired'; expiryHtml = `期限切れ！ (${item.expiry})`; }
+                else if (diffDays <= 90) { expiryClass = 'near-expiry'; expiryHtml = `まもなく期限 (${item.expiry})`; }
+                else { expiryHtml = `期限: ${item.expiry}`; }
+            }
+
+            li.innerHTML = `
+                <div class="item-main">
+                    <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggle(${index})">
+                    <span class="item-text">${item.text}</span>
+                    <button class="del-btn" onclick="remove(${index})">削除</button>
+                </div>
+                ${item.expiry ? `<div class="expiry-label ${expiryClass}">${expiryHtml}</div>` : ''}
+            `;
+            if (item.checked) { doneCount++; doneList.appendChild(li); }
+            else { todoList.appendChild(li); }
+        });
+
+        const percent = items.length > 0 ? (doneCount / items.length) * 100 : 0;
+        progressFill.style.width = percent + '%';
+        lastUpdateLabel.textContent = `最終点検日: ${lastCheckedDate}`;
+        
+        localStorage.setItem('my-disaster-kit-v7', JSON.stringify(items));
+    }
+
+    // 更新日時を記録する関数
+    function recordDate() {
+        const now = new Date();
+        lastCheckedDate = now.toLocaleDateString('ja-JP') + " " + now.toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
+        localStorage.setItem('my-kit-last-date', lastCheckedDate);
+    }
+
+    function addItem(text, expiry) {
+        if (text) {
+            items.push({ text: text, expiry: expiry, checked: false });
+            recordDate();
+            render();
+        }
+    }
+
+    addBtn.onclick = () => {
+        addItem(input.value.trim(), expiryInput.value);
+        input.value = '';
+        expiryInput.value = '';
+    };
+
+    window.quickAdd = (text) => addItem(text, "");
+    window.toggle = (i) => { items[i].checked = !items[i].checked; recordDate(); render(); };
+    window.remove = (i) => { items.splice(i, 1); recordDate(); render(); };
+
+    render();
+</script>
+</body>
+</html>
